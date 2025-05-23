@@ -36,7 +36,7 @@ export const ProfileType = new GraphQLObjectType({
   }),
 });
 
-export const UserType = new GraphQLObjectType({
+export const UserType: GraphQLObjectType = new GraphQLObjectType({
   name: 'User',
   description: 'Represents a user in the system',
   fields: () => ({
