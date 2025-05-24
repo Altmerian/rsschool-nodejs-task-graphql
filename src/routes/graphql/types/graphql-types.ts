@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { DataLoaders } from '../dataLoaders.js';
 
 export interface GraphQLContext {
   prisma: PrismaClient;
+  loaders: DataLoaders;
 }
 
 export interface IdArgs {

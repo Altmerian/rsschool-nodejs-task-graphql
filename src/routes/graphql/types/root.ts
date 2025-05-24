@@ -1,7 +1,8 @@
-import { GraphQLObjectType, GraphQLList, GraphQLNonNull, GraphQLString } from 'graphql';
+import { GraphQLObjectType, GraphQLList, GraphQLNonNull, GraphQLString, GraphQLResolveInfo } from 'graphql';
 import { UUIDType } from './uuid.js';
 import { MemberTypeIdEnum } from './enums.js';
 import { MemberType, UserType, PostType, ProfileType } from './objects.js';
+import { getOptimizedUsers, getOptimizedUser } from '../utils/queryOptimizer.js';
 import {
   CreateUserInput,
   CreateProfileInput,
@@ -50,8 +51,8 @@ export const RootQueryType = new GraphQLObjectType({
     },
     users: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(UserType))),
-      resolve: async (_parent: unknown, _args: unknown, context: GraphQLContext): Promise<UserModel[]> => {
-        return context.prisma.user.findMany();
+      resolve: async (_parent: unknown, _args: unknown, context: GraphQLContext, info: GraphQLResolveInfo): Promise<UserModel[]> => {
+        return getOptimizedUsers(context, info);
       },
     },
     user: {
@@ -59,10 +60,8 @@ export const RootQueryType = new GraphQLObjectType({
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: async (_parent: unknown, args: IdArgs, context: GraphQLContext): Promise<UserModel | null> => {
-        return context.prisma.user.findUnique({
-          where: { id: args.id },
-        });
+      resolve: async (_parent: unknown, args: IdArgs, context: GraphQLContext, info: GraphQLResolveInfo): Promise<UserModel | null> => {
+        return getOptimizedUser(args.id, context, info);
       },
     },
     posts: {
