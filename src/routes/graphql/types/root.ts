@@ -10,6 +10,14 @@ import {
   ChangeProfileInput,
   ChangePostInput,
 } from './inputs.js';
+import {
+  GraphQLContext,
+  MemberType as MemberTypeModel,
+  User as UserModel,
+  Post as PostModel,
+  Profile as ProfileModel,
+  IdArgs,
+} from './graphql-types.js';
 
 export const RootQueryType = new GraphQLObjectType({
   name: 'RootQueryType',
@@ -17,47 +25,71 @@ export const RootQueryType = new GraphQLObjectType({
   fields: {
     memberTypes: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(MemberType))),
-      resolve: () => [],
+      resolve: async (_parent: unknown, _args: unknown, context: GraphQLContext): Promise<MemberTypeModel[]> => {
+        return context.prisma.memberType.findMany();
+      },
     },
     memberType: {
       type: MemberType,
       args: {
         id: { type: new GraphQLNonNull(MemberTypeIdEnum) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: IdArgs, context: GraphQLContext): Promise<MemberTypeModel | null> => {
+        return context.prisma.memberType.findUnique({
+          where: { id: args.id },
+        });
+      },
     },
     users: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(UserType))),
-      resolve: () => [],
+      resolve: async (_parent: unknown, _args: unknown, context: GraphQLContext): Promise<UserModel[]> => {
+        return context.prisma.user.findMany();
+      },
     },
     user: {
       type: UserType,
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: IdArgs, context: GraphQLContext): Promise<UserModel | null> => {
+        return context.prisma.user.findUnique({
+          where: { id: args.id },
+        });
+      },
     },
     posts: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(PostType))),
-      resolve: () => [],
+      resolve: async (_parent: unknown, _args: unknown, context: GraphQLContext): Promise<PostModel[]> => {
+        return context.prisma.post.findMany();
+      },
     },
     post: {
       type: PostType,
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: IdArgs, context: GraphQLContext): Promise<PostModel | null> => {
+        return context.prisma.post.findUnique({
+          where: { id: args.id },
+        });
+      },
     },
     profiles: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(ProfileType))),
-      resolve: () => [],
+      resolve: async (_parent: unknown, _args: unknown, context: GraphQLContext): Promise<ProfileModel[]> => {
+        return context.prisma.profile.findMany();
+      },
     },
     profile: {
       type: ProfileType,
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: IdArgs, context: GraphQLContext): Promise<ProfileModel | null> => {
+        return context.prisma.profile.findUnique({
+          where: { id: args.id },
+        });
+      },
     },
   },
 });

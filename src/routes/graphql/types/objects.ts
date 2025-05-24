@@ -1,6 +1,14 @@
 import { GraphQLObjectType, GraphQLString, GraphQLFloat, GraphQLInt, GraphQLBoolean, GraphQLList, GraphQLNonNull } from 'graphql';
 import { UUIDType } from './uuid.js';
 import { MemberTypeIdEnum } from './enums.js';
+import {
+  GraphQLContext,
+  Profile as ProfileModel,
+  User as UserModel,
+  Post as PostModel,
+  MemberType as MemberTypeModel,
+  UserWithSubscriptions
+} from './graphql-types.js';
 
 export const MemberType = new GraphQLObjectType({
   name: 'MemberType',
@@ -31,7 +39,11 @@ export const ProfileType = new GraphQLObjectType({
     yearOfBirth: { type: new GraphQLNonNull(GraphQLInt) },
     memberType: {
       type: new GraphQLNonNull(MemberType),
-      resolve: () => ({}),
+      resolve: async (parent: ProfileModel, _args: unknown, context: GraphQLContext): Promise<MemberTypeModel | null> => {
+        return context.prisma.memberType.findUnique({
+          where: { id: parent.memberTypeId },
+        });
+      },
     },
   }),
 });
@@ -45,19 +57,39 @@ export const UserType: GraphQLObjectType = new GraphQLObjectType({
     balance: { type: new GraphQLNonNull(GraphQLFloat) },
     profile: {
       type: ProfileType,
-      resolve: () => ({}),
+      resolve: async (parent: UserModel, _args: unknown, context: GraphQLContext): Promise<ProfileModel | null> => {
+        return context.prisma.profile.findUnique({
+          where: { userId: parent.id },
+        });
+      },
     },
     posts: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(PostType))),
-      resolve: () => [],
+      resolve: async (parent: UserModel, _args: unknown, context: GraphQLContext): Promise<PostModel[]> => {
+        return context.prisma.post.findMany({
+          where: { authorId: parent.id },
+        });
+      },
     },
     userSubscribedTo: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(UserType))),
-      resolve: () => [],
+      resolve: async (parent: UserModel, _args: unknown, context: GraphQLContext): Promise<UserModel[]> => {
+        const user = await context.prisma.user.findUnique({
+          where: { id: parent.id },
+          include: { userSubscribedTo: { include: { author: true } } },
+        }) as UserWithSubscriptions | null;
+        return user?.userSubscribedTo?.map((sub: { author: UserModel }) => sub.author) || [];
+      },
     },
     subscribedToUser: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(UserType))),
-      resolve: () => [],
+      resolve: async (parent: UserModel, _args: unknown, context: GraphQLContext): Promise<UserModel[]> => {
+        const user = await context.prisma.user.findUnique({
+          where: { id: parent.id },
+          include: { subscribedToUser: { include: { subscriber: true } } },
+        }) as UserWithSubscriptions | null;
+        return user?.subscribedToUser?.map((sub: { subscriber: UserModel }) => sub.subscriber) || [];
+      },
     },
   }),
 });
