@@ -42,3 +42,62 @@ export interface UserWithSubscriptions {
   userSubscribedTo?: Array<{ author: User }>;
   subscribedToUser?: Array<{ subscriber: User }>;
 }
+
+// Mutation argument interfaces
+export interface CreateUserArgs {
+  dto: {
+    name: string;
+    balance: number;
+  };
+}
+
+export interface CreateProfileArgs {
+  dto: {
+    isMale: boolean;
+    yearOfBirth: number;
+    userId: string;
+    memberTypeId: string;
+  };
+}
+
+export interface CreatePostArgs {
+  dto: {
+    title: string;
+    content: string;
+    authorId: string;
+  };
+}
+
+export interface ChangeUserArgs {
+  id: string;
+  dto: {
+    name?: string;
+    balance?: number;
+  };
+}
+
+export interface ChangeProfileArgs {
+  id: string;
+  dto: {
+    isMale?: boolean;
+    yearOfBirth?: number;
+    memberTypeId?: string;
+  };
+}
+
+export interface ChangePostArgs {
+  id: string;
+  dto: {
+    title?: string;
+    content?: string;
+  };
+}
+
+export interface DeleteArgs {
+  id: string;
+}
+
+export interface SubscriptionArgs {
+  userId: string;
+  authorId: string;
+}

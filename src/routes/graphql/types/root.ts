@@ -17,6 +17,14 @@ import {
   Post as PostModel,
   Profile as ProfileModel,
   IdArgs,
+  CreateUserArgs,
+  CreateProfileArgs,
+  CreatePostArgs,
+  ChangeUserArgs,
+  ChangeProfileArgs,
+  ChangePostArgs,
+  DeleteArgs,
+  SubscriptionArgs,
 } from './graphql-types.js';
 
 export const RootQueryType = new GraphQLObjectType({
@@ -103,21 +111,33 @@ export const MutationsType = new GraphQLObjectType({
       args: {
         dto: { type: new GraphQLNonNull(CreateUserInput) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: CreateUserArgs, context: GraphQLContext): Promise<UserModel> => {
+        return context.prisma.user.create({
+          data: args.dto,
+        });
+      },
     },
     createProfile: {
       type: new GraphQLNonNull(ProfileType),
       args: {
         dto: { type: new GraphQLNonNull(CreateProfileInput) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: CreateProfileArgs, context: GraphQLContext): Promise<ProfileModel> => {
+        return context.prisma.profile.create({
+          data: args.dto,
+        });
+      },
     },
     createPost: {
       type: new GraphQLNonNull(PostType),
       args: {
         dto: { type: new GraphQLNonNull(CreatePostInput) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: CreatePostArgs, context: GraphQLContext): Promise<PostModel> => {
+        return context.prisma.post.create({
+          data: args.dto,
+        });
+      },
     },
     changeUser: {
       type: new GraphQLNonNull(UserType),
@@ -125,7 +145,12 @@ export const MutationsType = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
         dto: { type: new GraphQLNonNull(ChangeUserInput) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: ChangeUserArgs, context: GraphQLContext): Promise<UserModel> => {
+        return context.prisma.user.update({
+          where: { id: args.id },
+          data: args.dto,
+        });
+      },
     },
     changeProfile: {
       type: new GraphQLNonNull(ProfileType),
@@ -133,7 +158,12 @@ export const MutationsType = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
         dto: { type: new GraphQLNonNull(ChangeProfileInput) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: ChangeProfileArgs, context: GraphQLContext): Promise<ProfileModel> => {
+        return context.prisma.profile.update({
+          where: { id: args.id },
+          data: args.dto,
+        });
+      },
     },
     changePost: {
       type: new GraphQLNonNull(PostType),
@@ -141,28 +171,48 @@ export const MutationsType = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
         dto: { type: new GraphQLNonNull(ChangePostInput) },
       },
-      resolve: () => ({}),
+      resolve: async (_parent: unknown, args: ChangePostArgs, context: GraphQLContext): Promise<PostModel> => {
+        return context.prisma.post.update({
+          where: { id: args.id },
+          data: args.dto,
+        });
+      },
     },
     deleteUser: {
       type: new GraphQLNonNull(GraphQLString),
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: () => 'User deleted',
+      resolve: async (_parent: unknown, args: DeleteArgs, context: GraphQLContext): Promise<string> => {
+        await context.prisma.user.delete({
+          where: { id: args.id },
+        });
+        return args.id;
+      },
     },
     deletePost: {
       type: new GraphQLNonNull(GraphQLString),
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: () => 'Post deleted',
+      resolve: async (_parent: unknown, args: DeleteArgs, context: GraphQLContext): Promise<string> => {
+        await context.prisma.post.delete({
+          where: { id: args.id },
+        });
+        return args.id;
+      },
     },
     deleteProfile: {
       type: new GraphQLNonNull(GraphQLString),
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: () => 'Profile deleted',
+      resolve: async (_parent: unknown, args: DeleteArgs, context: GraphQLContext): Promise<string> => {
+        await context.prisma.profile.delete({
+          where: { id: args.id },
+        });
+        return args.id;
+      },
     },
     subscribeTo: {
       type: new GraphQLNonNull(GraphQLString),
@@ -170,7 +220,19 @@ export const MutationsType = new GraphQLObjectType({
         userId: { type: new GraphQLNonNull(UUIDType) },
         authorId: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: () => 'Subscribed',
+      resolve: async (_parent: unknown, args: SubscriptionArgs, context: GraphQLContext): Promise<string> => {
+        await context.prisma.user.update({
+          where: { id: args.userId },
+          data: {
+            userSubscribedTo: {
+              create: {
+                authorId: args.authorId,
+              },
+            },
+          },
+        });
+        return `User ${args.userId} subscribed to ${args.authorId}`;
+      },
     },
     unsubscribeFrom: {
       type: new GraphQLNonNull(GraphQLString),
@@ -178,7 +240,22 @@ export const MutationsType = new GraphQLObjectType({
         userId: { type: new GraphQLNonNull(UUIDType) },
         authorId: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: () => 'Unsubscribed',
+      resolve: async (_parent: unknown, args: SubscriptionArgs, context: GraphQLContext): Promise<string> => {
+        await context.prisma.user.update({
+          where: { id: args.userId },
+          data: {
+            userSubscribedTo: {
+              delete: {
+                subscriberId_authorId: {
+                  subscriberId: args.userId,
+                  authorId: args.authorId,
+                },
+              },
+            },
+          },
+        });
+        return `User ${args.userId} unsubscribed from ${args.authorId}`;
+      },
     },
   },
 });
