@@ -1,6 +1,21 @@
 import { GraphQLResolveInfo, FieldNode, SelectionNode, Kind } from 'graphql';
 import { GraphQLContext, UserWithSubscriptions, User as UserModel } from '../types/graphql-types.js';
 
+// Type for raw SubscribersOnAuthors junction table records (simple boolean includes)
+interface SubscribersOnAuthorsRecord {
+  authorId: string;
+  subscriberId: string;
+}
+
+// Type for complex includes with nested User objects
+interface SubscriptionWithUser {
+  author?: UserModel;
+  subscriber?: UserModel;
+}
+
+// Union type to handle both formats
+type SubscriptionRecord = SubscribersOnAuthorsRecord | SubscriptionWithUser;
+
 /**
  * Helper function to extract requested field names from GraphQL selection set
  */
@@ -10,7 +25,7 @@ function getRequestedFields(info: GraphQLResolveInfo): Set<string> {
   function extractFields(selections: readonly SelectionNode[]): void {
     for (const selection of selections) {
       if (selection.kind === Kind.FIELD) {
-        const fieldNode = selection as FieldNode;
+        const fieldNode = selection;
         requestedFields.add(fieldNode.name.value);
 
         if (fieldNode.selectionSet) {
@@ -35,40 +50,61 @@ export async function getOptimizedUsers(
   context: GraphQLContext,
   info: GraphQLResolveInfo
 ): Promise<UserModel[]> {
-  // Parse the GraphQL query to determine which fields are requested
   const requestedFields = getRequestedFields(info);
-  console.log('DEBUG: Requested fields:', Array.from(requestedFields));
 
   const needsUserSubscribedTo = requestedFields.has('userSubscribedTo');
   const needsSubscribedToUser = requestedFields.has('subscribedToUser');
 
-  console.log('DEBUG: needsUserSubscribedTo:', needsUserSubscribedTo, 'needsSubscribedToUser:', needsSubscribedToUser);
 
   if (needsUserSubscribedTo || needsSubscribedToUser) {
-    // If subscription fields are requested, include them in the query
-    const include: Record<string, unknown> = {};
+    const include: Record<string, boolean> = {};
     if (needsUserSubscribedTo) {
-      include.userSubscribedTo = { include: { author: true } };
+      include.userSubscribedTo = true;
     }
     if (needsSubscribedToUser) {
-      include.subscribedToUser = { include: { subscriber: true } };
+      include.subscribedToUser = true;
     }
 
-    console.log('DEBUG: Prisma include:', JSON.stringify(include, null, 2));
 
     const usersWithSubscriptions = await context.prisma.user.findMany({
       include,
     }) as UserWithSubscriptions[];
 
-    // Prime the DataLoaders with the fetched subscription data
+    const userMap = new Map<string, UserModel>();
+    usersWithSubscriptions.forEach(user => {
+      userMap.set(user.id, user);
+    });
+
     usersWithSubscriptions.forEach((user) => {
+      // Prime DataLoaders for each user using existing data
       if (user.userSubscribedTo && needsUserSubscribedTo) {
-        const authors = user.userSubscribedTo.map((sub: { author: UserModel }) => sub.author);
-        context.loaders.userSubscribedToLoader.prime(user.id, authors);
+        const userAuthors: UserModel[] = [];
+        (user.userSubscribedTo as SubscriptionRecord[]).forEach((sub: SubscriptionRecord) => {
+          if ('author' in sub && sub.author) {
+            userAuthors.push(sub.author);
+          } else if ('authorId' in sub && sub.authorId) {
+            const authorUser = userMap.get(sub.authorId);
+            if (authorUser) {
+              userAuthors.push(authorUser);
+            }
+          }
+        });
+        context.loaders.userSubscribedToLoader.prime(user.id, userAuthors);
       }
+      
       if (user.subscribedToUser && needsSubscribedToUser) {
-        const subscribers = user.subscribedToUser.map((sub: { subscriber: UserModel }) => sub.subscriber);
-        context.loaders.subscribedToUserLoader.prime(user.id, subscribers);
+        const userSubscribers: UserModel[] = [];
+        (user.subscribedToUser as SubscriptionRecord[]).forEach((sub: SubscriptionRecord) => {
+          if ('subscriber' in sub && sub.subscriber) {
+            userSubscribers.push(sub.subscriber);
+          } else if ('subscriberId' in sub && sub.subscriberId) {
+            const subscriberUser = userMap.get(sub.subscriberId);
+            if (subscriberUser) {
+              userSubscribers.push(subscriberUser);
+            }
+          }
+        });
+        context.loaders.subscribedToUserLoader.prime(user.id, userSubscribers);
       }
     });
 
@@ -88,19 +124,17 @@ export async function getOptimizedUser(
   context: GraphQLContext,
   info: GraphQLResolveInfo
 ): Promise<UserModel | null> {
-  // Parse the GraphQL query to determine which fields are requested
   const requestedFields = getRequestedFields(info);
   const needsUserSubscribedTo = requestedFields.has('userSubscribedTo');
   const needsSubscribedToUser = requestedFields.has('subscribedToUser');
 
   if (needsUserSubscribedTo || needsSubscribedToUser) {
-    // If subscription fields are requested, include them in the query
-    const include: Record<string, unknown> = {};
+    const include: Record<string, boolean> = {};
     if (needsUserSubscribedTo) {
-      include.userSubscribedTo = { include: { author: true } };
+      include.userSubscribedTo = true;
     }
     if (needsSubscribedToUser) {
-      include.subscribedToUser = { include: { subscriber: true } };
+      include.subscribedToUser = true;
     }
 
     const userWithSubscriptions = await context.prisma.user.findUnique({
@@ -108,22 +142,9 @@ export async function getOptimizedUser(
       include,
     }) as UserWithSubscriptions | null;
 
-    // Prime the DataLoaders with the fetched subscription data
-    if (userWithSubscriptions) {
-      if (userWithSubscriptions.userSubscribedTo && needsUserSubscribedTo) {
-        const authors = userWithSubscriptions.userSubscribedTo.map((sub: { author: UserModel }) => sub.author);
-        context.loaders.userSubscribedToLoader.prime(userWithSubscriptions.id, authors);
-      }
-      if (userWithSubscriptions.subscribedToUser && needsSubscribedToUser) {
-        const subscribers = userWithSubscriptions.subscribedToUser.map((sub: { subscriber: UserModel }) => sub.subscriber);
-        context.loaders.subscribedToUserLoader.prime(userWithSubscriptions.id, subscribers);
-      }
-    }
-
     return userWithSubscriptions;
   }
 
-  // If no subscription fields are requested, use simple query
   return context.prisma.user.findUnique({
     where: { id: userId },
   });

@@ -23,7 +23,6 @@ export function createDataLoaders(prisma: PrismaClient) {
         where: { userId: { in: [...userIds] } },
       });
 
-      // Create a map for O(1) lookup
       const profileMap = new Map<string, ProfileModel>();
       profiles.forEach((profile) => {
         profileMap.set(profile.userId, profile);
@@ -63,21 +62,17 @@ export function createDataLoaders(prisma: PrismaClient) {
    */
   const profileMemberTypeLoader = new DataLoader<string, MemberTypeModel | null>(
     async (profileIds: readonly string[]): Promise<(MemberTypeModel | null)[]> => {
-      // First get the profiles to extract memberTypeIds
       const profiles = await prisma.profile.findMany({
         where: { id: { in: [...profileIds] } },
         select: { id: true, memberTypeId: true },
       });
 
-      // Extract unique memberTypeIds
       const memberTypeIds = [...new Set(profiles.map((p) => p.memberTypeId))];
 
-      // Fetch member types
       const memberTypes = await prisma.memberType.findMany({
         where: { id: { in: memberTypeIds } },
       });
 
-      // Create maps for lookup
       const profileToMemberTypeIdMap = new Map<string, string>();
       profiles.forEach((profile) => {
         profileToMemberTypeIdMap.set(profile.id, profile.memberTypeId);
